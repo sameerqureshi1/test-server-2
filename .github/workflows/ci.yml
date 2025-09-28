@@ -1,4 +1,4 @@
-name: Deploy Static Websitee
+name: Deploy Static Website
 
 on:
   push:
