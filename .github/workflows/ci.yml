@@ -8,7 +8,9 @@ on:
 env:
   REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
   REMOTE_USER: ${{ secrets.REMOTE_USER }}
-  REMOTE_PATH: /var/www/test-server-2
+  REMOTE_PATH: /home/ubuntu/test-server-2
+  CONTAINER_NAME: test-server-2
+  IMAGE_NAME: test-server-2:latest
 
 jobs:
   deploy:
@@ -18,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Copy files to EC2
+      - name: Copy project files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.REMOTE_HOST }}
@@ -27,11 +29,23 @@ jobs:
           source: "./*"
           target: ${{ env.REMOTE_PATH }}
 
-      - name: Reload Nginx
+      - name: Deploy on EC2 (Build & Run Docker)
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ env.REMOTE_HOST }}
           username: ${{ env.REMOTE_USER }}
           key: ${{ secrets.AWS_SSH_KEY }}
           script: |
+            cd ${{ env.REMOTE_PATH }}
+            echo "Stopping old container if running..."
+            sudo docker stop ${{ env.CONTAINER_NAME }} || true
+            sudo docker rm ${{ env.CONTAINER_NAME }} || true
+
+            echo "Building new Docker image..."
+            sudo docker build -t ${{ env.IMAGE_NAME }} .
+
+            echo "Starting new container..."
+            sudo docker run -d --name ${{ env.CONTAINER_NAME }} -p 80:80 ${{ env.IMAGE_NAME }}
+
+            echo "Reloading Nginx..."
             sudo systemctl reload nginx
